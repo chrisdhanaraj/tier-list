@@ -15,7 +15,8 @@
     "compression": "^1.7.1",
     "polka": "next",
     "sirv": "^1.0.0",
-    "tailwindcss": "^1.7.6"
+    "tailwindcss": "^1.7.6",
+    "uuid": "^8.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",

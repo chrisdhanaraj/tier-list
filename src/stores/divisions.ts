@@ -1,5 +1,4 @@
-import { writable, derived } from "svelte/store";
-import { tierDictionary } from "./tiers";
+import { writable } from "svelte/store";
 
 enum Divisions {
   Bronze = "Bronze",
@@ -9,98 +8,70 @@ enum Divisions {
   Challenger = "Challenger",
 }
 
-interface Tier {
+export interface Division {
+  id: number;
   name: string;
-  champions: string[];
-}
-
-export interface DivisionItem {
-  name: string;
-  tiers: Tier[];
 }
 
 interface DivisionStoreStructure {
-  resources: Record<DivisionItem["name"], DivisionItem>;
-  order: DivisionItem["name"][];
+  resources: Record<Division["id"], Division>;
+  order: Division["id"][];
 }
 
-const defaultDivisions: DivisionItem[] = Object.keys(Divisions).map((item) => {
-  return {
-    name: item,
-    tiers: [],
+const defaultResources = {
+  resources: {},
+  order: [],
+};
+
+Object.keys(Divisions).forEach((divisionName, index) => {
+  defaultResources.resources[index] = {
+    id: index,
+    name: divisionName,
   };
+
+  defaultResources.order.push(index);
 });
 
 export function createDivisionStore() {
-  const { subscribe, set, update } = writable<DivisionItem[]>(defaultDivisions);
+  const { subscribe, update } = writable<DivisionStoreStructure>(
+    defaultResources
+  );
 
   return {
     subscribe,
-    addChampion: ({ divisionName, tierName, champion }) => {},
-    mergeWithNextDivision: (startDivisionName: string) => {
+    mergeWithNextDivision: (startDivisionId: number) => {
+      // Merge order, merge resources
       update((currentState) => {
-        const startDivisionIndex = currentState.findIndex((division) => {
-          return division.name === startDivisionName;
+        // clone so we can operate
+        const newResources = { ...currentState.resources };
+        const newOrder = [...currentState.order];
+
+        const startDivisionIndex = newOrder.findIndex((id) => {
+          return id === startDivisionId;
         });
 
-        console.log(startDivisionIndex, currentState);
+        const startDivision = newResources[startDivisionIndex];
+        const endDivision = newResources[startDivisionIndex + 1];
 
-        const startDivision = currentState[startDivisionIndex];
-        const endDivision = currentState[startDivisionIndex + 1];
-
-        const mergedTiers: Tier[] = startDivision.tiers.map((tier, index) => {
-          return {
-            name: tier.name,
-            champions: tier.champions.concat(
-              endDivision.tiers[index].champions
-            ),
-          };
-        });
-
-        const mergedDivisions: DivisionItem = {
+        const mergedDivisions: Division = {
+          id: 100,
           name: `${startDivision.name} / ${endDivision.name}`,
-          tiers: mergedTiers,
         };
 
-        const finalState = [
-          ...currentState.slice(0, startDivisionIndex),
-          mergedDivisions,
-          ...currentState.slice(startDivisionIndex + 2, currentState.length),
-        ];
+        // remove old stuff
+        delete newResources[startDivision.id];
+        delete newResources[endDivision.id];
 
-        return finalState;
-      });
-    },
-    addTier: ({ name }) => {
-      update((currentState) => {
-        const newState = currentState.map((division) => {
-          const newTiers = [...division.tiers];
+        // add in the new one
+        newOrder.splice(startDivisionIndex, 2, mergedDivisions.id);
 
-          newTiers.push({
-            name,
-            champions: [],
-          });
-
-          return {
-            ...division,
-            tiers: newTiers,
-          };
-        });
-
-        return newState;
+        return {
+          resources: newResources,
+          order: newOrder,
+        };
       });
     },
   };
 }
 
 export const divisionStore = createDivisionStore();
-
-export const divisionDictionary = derived(divisionStore, ($divisionStore) => {
-  const dictionary = new Map();
-
-  $divisionStore.forEach((division) => {
-    dictionary.set(division.name, division);
-  });
-
-  return dictionary;
-});
