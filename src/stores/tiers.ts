@@ -1,18 +1,29 @@
-import { writable, derived } from "svelte/store";
+import { writable, get } from "svelte/store";
 import { v4 as generateId } from "uuid";
-import type { Division } from "./divisions";
-import type { Champion } from "./champions";
+import { divisionTierStore } from "./divisionTier";
 
-interface Tier {
-  divisionId: Division["id"];
+export interface Tier {
   id: number;
   name: string;
-  championOrder: Champion["id"][];
 }
 
 interface TierStore {
   resources: Record<Tier["id"], Tier>;
   order: Tier["id"][];
+}
+
+interface AddTier {
+  name: string;
+  position: number;
+}
+
+interface RemoveTier {
+  tierId: Tier["id"];
+}
+
+interface RenameTier {
+  tierId: Tier["id"];
+  name: string;
 }
 
 export function createTierStore() {
@@ -23,81 +34,19 @@ export function createTierStore() {
 
   return {
     subscribe,
-    addChampionToTier: ({ championId, tierId, position }: any) => {
+    addTier: ({ name, position }: AddTier) => {
       update((state) => {
-        const newResources = { ...state.resources };
-        const { championOrder } = newResources[tierId];
-
-        championOrder.splice(position ?? championOrder.length, 0, championId);
-
-        return {
-          resources: newResources,
-          order: state.order,
-        };
-      });
-    },
-    bulkAddChampionToTier: ({ championIds, tierId }: any) => {
-      update((state) => {
-        const newResources = { ...state.resources };
-        const { championOrder } = newResources[tierId];
-
-        championOrder.concat(championIds);
-
-        return {
-          resources: newResources,
-          order: state.order,
-        };
-      });
-    },
-    deleteChampionFromTier: ({ championPosition, tierId }: any) => {
-      update((state) => {
-        const newResources = { ...state.resources };
-        const { championOrder } = newResources[tierId];
-
-        championOrder.splice(championPosition, 1);
-
-        return {
-          resources: newResources,
-          order: state.order,
-        };
-      });
-    },
-    moveChampionFromTier: ({
-      startChampionPosition,
-      endChampionPosition,
-      startTierId,
-      endTierId,
-    }: any) => {
-      update((state) => {
-        const newResources = { ...state.resources };
-        const { championOrder: startChampionOrder } = newResources[startTierId];
-        const championId = startChampionOrder[startChampionPosition];
-
-        startChampionOrder.splice(startChampionPosition, 1);
-
-        if (endTierId === undefined) {
-          // moving within the same tier
-          startChampionOrder.splice(endChampionPosition, 0, championId);
-        } else {
-          newResources[endTierId].championOrder.splice(
-            endChampionPosition,
-            0,
-            championId
-          );
-        }
-
-        return {
-          resources: newResources,
-          order: state.order,
-        };
-      });
-    },
-    addTier: ({ name, position, divisionId }: any) => {
-      update((state) => {
+        // Create one for every division
         const id = generateId();
+
+        const newTier: Tier = {
+          id,
+          name,
+        };
 
         const newResources = {
           ...state.resources,
+          [id]: newTier,
         };
 
         const newOrder = state.order.splice(
@@ -106,27 +55,8 @@ export function createTierStore() {
           id
         );
 
-        newResources[id] = {
-          id,
-          divisionId,
-          name,
-          championOrder: [],
-        };
-
-        return {
-          resources: newResources,
-          order: newOrder,
-        };
-      });
-    },
-    removeTier: ({ id }: any) => {
-      update((state) => {
-        const newResources = { ...state.resources };
-
-        delete newResources[id];
-
-        const newOrder = state.order.filter((orderId) => {
-          return orderId !== id;
+        divisionTierStore.initializeDivisionTier({
+          tierId: id,
         });
 
         return {
@@ -135,7 +65,23 @@ export function createTierStore() {
         };
       });
     },
-    renameTier: ({ tierId, name }: any) => {
+    removeTier: ({ tierId }: RemoveTier) => {
+      update((state) => {
+        const newResources = { ...state.resources };
+
+        delete newResources[tierId];
+
+        const newOrder = state.order.filter((orderId) => {
+          return orderId !== tierId;
+        });
+
+        return {
+          resources: newResources,
+          order: newOrder,
+        };
+      });
+    },
+    renameTier: ({ tierId, name }: RenameTier) => {
       update((state) => {
         const newResources = { ...state.resources };
 
